@@ -1,0 +1,32 @@
+# Environment variables (contains API keys - DO NOT COMMIT)
+.env
+*.env
+!.env.example
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+.venv/
+env/
+ENV/
+
+# AWS
+.aws/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Backup files
+pois_backup.json
+*.json.bak
+
+# Logs
+*.log

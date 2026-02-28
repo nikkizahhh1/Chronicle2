@@ -1,0 +1,100 @@
+service: travel-assistant-backend
+
+provider:
+  name: aws
+  runtime: python3.9
+  region: us-east-1
+  environment:
+    JWT_SECRET: ${env:JWT_SECRET}
+  iam:
+    role:
+      statements:
+        - Effect: Allow
+          Action:
+            - dynamodb:Query
+            - dynamodb:Scan
+            - dynamodb:GetItem
+            - dynamodb:PutItem
+            - dynamodb:UpdateItem
+            - dynamodb:DeleteItem
+          Resource:
+            - "arn:aws:dynamodb:${self:provider.region}:*:table/users"
+            - "arn:aws:dynamodb:${self:provider.region}:*:table/trips"
+            - "arn:aws:dynamodb:${self:provider.region}:*:table/travel-pois"
+            - "arn:aws:dynamodb:${self:provider.region}:*:table/*/index/*"
+
+functions:
+  signup:
+    handler: handlers/auth.signup
+    events:
+      - http:
+          path: auth/signup
+          method: post
+          cors: true
+
+  login:
+    handler: handlers/auth.login
+    events:
+      - http:
+          path: auth/login
+          method: post
+          cors: true
+
+  submitQuiz:
+    handler: handlers/quiz.submit_quiz
+    events:
+      - http:
+          path: quiz/submit
+          method: post
+          cors: true
+
+  getQuiz:
+    handler: handlers/quiz.get_quiz
+    events:
+      - http:
+          path: quiz
+          method: get
+          cors: true
+
+  createTrip:
+    handler: handlers/trips.create_trip
+    events:
+      - http:
+          path: trips
+          method: post
+          cors: true
+
+  listTrips:
+    handler: handlers/trips.list_trips
+    events:
+      - http:
+          path: trips
+          method: get
+          cors: true
+
+  getTrip:
+    handler: handlers/trips.get_trip
+    events:
+      - http:
+          path: trips/{trip_id}
+          method: get
+          cors: true
+
+  updateTrip:
+    handler: handlers/trips.update_trip
+    events:
+      - http:
+          path: trips/{trip_id}
+          method: put
+          cors: true
+
+  deleteTrip:
+    handler: handlers/trips.delete_trip
+    events:
+      - http:
+          path: trips/{trip_id}
+          method: delete
+          cors: true
+
+plugins:
+  - serverless-python-requirements
