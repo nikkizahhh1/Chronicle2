@@ -7,9 +7,12 @@ import {
   TouchableOpacity,
   Image,
   Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { api } from '../services/api';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'InterestQuiz'>;
 
@@ -34,6 +37,7 @@ const INTERESTS: Interest[] = [
   { id: 'camping', label: 'Camping', icon: require('../../assets/images/icons/camping.png') },
   { id: 'hiking', label: 'Hiking', icon: require('../../assets/images/icons/Icon.png') },
   { id: 'local', label: 'Local Gems', icon: require('../../assets/images/icons/map.png') },
+  { id: 'thrifting', label: 'Thrifting', icon: require('../../assets/images/icons/map.png') }, // TODO: Add thrifting-specific icon
 ];
 
 const MIN_SELECTIONS = 3;
@@ -41,6 +45,7 @@ const MAX_SELECTIONS = 5;
 
 export default function InterestQuizScreen({ navigation }: Props) {
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
+  const [loading, setLoading] = useState(false);
 
   const handleInterestPress = (id: string) => {
     if (selectedInterests.includes(id)) {
@@ -50,10 +55,30 @@ export default function InterestQuizScreen({ navigation }: Props) {
     }
   };
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     if (selectedInterests.length >= MIN_SELECTIONS) {
-      // TODO: Save to backend
-      navigation.navigate('Signup');
+      setLoading(true);
+
+      try {
+        // Save to AsyncStorage for immediate use
+        await AsyncStorage.setItem('quiz_results', JSON.stringify(selectedInterests));
+
+        // Try to save to backend (will work after deployment)
+        try {
+          await api.post('/quiz/submit', { interests: selectedInterests });
+        } catch (backendError) {
+          // Backend not deployed yet - that's okay, we have it in AsyncStorage
+          console.log('Quiz results saved locally, backend not yet connected');
+        }
+
+        navigation.navigate('Signup');
+      } catch (error) {
+        console.error('Failed to save quiz results:', error);
+        // Still navigate even if save fails
+        navigation.navigate('Signup');
+      } finally {
+        setLoading(false);
+      }
     }
   };
 
@@ -109,13 +134,17 @@ export default function InterestQuizScreen({ navigation }: Props) {
         <TouchableOpacity
           style={[
             styles.continueButton,
-            selectedInterests.length < MIN_SELECTIONS && styles.continueButtonDisabled,
+            (selectedInterests.length < MIN_SELECTIONS || loading) && styles.continueButtonDisabled,
           ]}
           onPress={handleContinue}
-          disabled={selectedInterests.length < MIN_SELECTIONS}
+          disabled={selectedInterests.length < MIN_SELECTIONS || loading}
           activeOpacity={0.8}
         >
-          <Text style={styles.continueButtonText}>Continue to My Trips</Text>
+          {loading ? (
+            <ActivityIndicator color="#F4EBDC" />
+          ) : (
+            <Text style={styles.continueButtonText}>Continue to My Trips</Text>
+          )}
         </TouchableOpacity>
 
         {/* Quote */}

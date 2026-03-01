@@ -13,9 +13,32 @@ import {
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
 import Slider from '@react-native-community/slider';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { api } from '../services/api';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TripQuestionnaire'>;
+
+const getIntensityLabel = (level: number): string => {
+  const labels = {
+    1: 'Very relaxed',
+    2: 'Relaxed',
+    3: 'Moderately packed',
+    4: 'Packed',
+    5: 'Very packed'
+  };
+  return labels[level as keyof typeof labels] || 'Moderate';
+};
+
+const getIntensityDescription = (level: number): string => {
+  const descriptions = {
+    1: '≤ 2 activities per day (very relaxed)',
+    2: '2-3 activities per day (relaxed)',
+    3: '3-4 activities per day (moderately packed)',
+    4: '4-5 activities per day (packed)',
+    5: '≥ 5 activities per day (very packed)'
+  };
+  return descriptions[level as keyof typeof descriptions] || '';
+};
 
 export default function TripQuestionnaireScreen({ navigation, route }: Props) {
   const { type } = route.params;
@@ -27,7 +50,7 @@ export default function TripQuestionnaireScreen({ navigation, route }: Props) {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [budget, setBudget] = useState('500');
-  const [busyness, setBusyness] = useState(0.5);
+  const [intensity, setIntensity] = useState(3); // 1-5 scale
   const [travelWith, setTravelWith] = useState<'solo' | 'group'>('solo');
   const [includeGas, setIncludeGas] = useState(false);
   const [scenicRoute, setScenicRoute] = useState(true);
@@ -48,6 +71,10 @@ export default function TripQuestionnaireScreen({ navigation, route }: Props) {
     setLoading(true);
 
     try {
+      // Get quiz results from AsyncStorage
+      const quizResultsJson = await AsyncStorage.getItem('quiz_results');
+      const interests = quizResultsJson ? JSON.parse(quizResultsJson) : [];
+
       // Build request payload
       const payload: any = {
         trip_type: type,
@@ -55,12 +82,14 @@ export default function TripQuestionnaireScreen({ navigation, route }: Props) {
         start_date: startDate,
         end_date: endDate,
         budget: budget,
-        intensity: Math.round(busyness * 10), // Convert 0-1 to 0-10
+        intensity: intensity, // 1-5 scale as per PDF requirements
         group_type: travelWith,
+        interests: interests, // Include quiz results for personalization
       };
 
       if (type === 'location') {
         payload.destination = destination;
+        payload.include_transport = includeTransport;
       } else {
         payload.start_location = startingPoint;
         payload.end_location = endingPoint;
@@ -220,24 +249,28 @@ export default function TripQuestionnaireScreen({ navigation, route }: Props) {
             <Text style={styles.helperText}>Total budget for the trip</Text>
           </View>
 
-          {/* Busyness Slider */}
+          {/* Activity Intensity Slider */}
           <View style={styles.card}>
-            <Text style={styles.cardTitle}>How busy do you want your days?</Text>
+            <Text style={styles.cardTitle}>How jam-packed do you want your days?</Text>
             <Slider
               style={styles.slider}
-              minimumValue={0}
-              maximumValue={1}
-              value={busyness}
-              onValueChange={setBusyness}
+              minimumValue={1}
+              maximumValue={5}
+              step={1}
+              value={intensity}
+              onValueChange={setIntensity}
               minimumTrackTintColor="#2F6F6D"
               maximumTrackTintColor="#E5D4C1"
               thumbTintColor="#2F6F6D"
             />
             <View style={styles.sliderLabels}>
-              <Text style={styles.sliderLabel}>Relaxed & chill</Text>
-              <Text style={styles.sliderLabelCenter}>{Math.round(busyness * 100)}%</Text>
-              <Text style={styles.sliderLabel}>Jam-packed</Text>
+              <Text style={styles.sliderLabel}>Very relaxed</Text>
+              <Text style={styles.sliderLabelCenter}>
+                Level {intensity}: {getIntensityLabel(intensity)}
+              </Text>
+              <Text style={styles.sliderLabel}>Very packed</Text>
             </View>
+            <Text style={styles.helperText}>{getIntensityDescription(intensity)}</Text>
           </View>
 
           {/* Traveling With */}

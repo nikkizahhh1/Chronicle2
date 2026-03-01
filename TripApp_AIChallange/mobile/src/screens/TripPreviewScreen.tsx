@@ -1,14 +1,17 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   ScrollView,
   TouchableOpacity,
   StyleSheet,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import ActivityCard, { Activity } from '../components/trip/ActivityCard';
 import DaySummary from '../components/trip/DaySummary';
+import { api } from '../services/api';
 
 // Mock data - replace with actual data from API
 const mockTripData = {
@@ -118,10 +121,96 @@ const mockTripData = {
 };
 
 export default function TripPreviewScreen({ navigation, route }: any) {
+  const { tripId } = route.params || {};
   const [currentDay, setCurrentDay] = useState(1);
+  const [tripData, setTripData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
 
-  const tripData = mockTripData;
-  const currentDayData = tripData.days.find((d) => d.dayNumber === currentDay) || tripData.days[0];
+  useEffect(() => {
+    fetchTripData();
+  }, [tripId]);
+
+  const fetchTripData = async () => {
+    if (!tripId) {
+      // Fallback to mock data if no tripId
+      setTripData(mockTripData);
+      setLoading(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const response = await api.get(`/trips/${tripId}`);
+
+      if (response.success && response.data) {
+        // Transform backend data to match expected format
+        const transformedData = transformBackendData(response.data);
+        setTripData(transformedData);
+      } else {
+        // Fallback to mock data
+        console.log('Using mock data - backend not connected');
+        setTripData(mockTripData);
+      }
+    } catch (error) {
+      console.error('Failed to fetch trip:', error);
+      // Fallback to mock data
+      setTripData(mockTripData);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const transformBackendData = (backendTrip: any) => {
+    // Transform backend trip format to UI format
+    return {
+      tripId: backendTrip.trip_id,
+      totalDays: backendTrip.duration || backendTrip.itinerary?.days?.length || 1,
+      days: (backendTrip.itinerary?.days || []).map((day: any, index: number) => ({
+        dayNumber: day.day || index + 1,
+        duration: `${day.activities?.length || 0} activities`,
+        estimatedCost: day.totalCostUSD ? `$${day.totalCostUSD}` : 'TBD',
+        activities: (day.activities || []).map((activity: any, actIndex: number) => ({
+          id: `${index}-${actIndex}`,
+          stepNumber: actIndex + 1,
+          time: activity.time || 'TBD',
+          category: activity.type || activity.category || 'Activity',
+          name: activity.name,
+          description: activity.description || '',
+          image: activity.image || 'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=800',
+          tags: activity.tags || [],
+          duration: activity.durationHours ? `${activity.durationHours} hours` : activity.estimated_duration || 'TBD',
+          cost: activity.costUSD || activity.estimated_cost || 0,
+          rating: activity.rating || 0,
+        })),
+      })),
+    };
+  };
+
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#2F6F6D" />
+          <Text style={styles.loadingText}>Loading your trip...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (!tripData) {
+    return (
+      <SafeAreaView style={styles.container}>
+        <View style={styles.errorContainer}>
+          <Text style={styles.errorText}>Failed to load trip</Text>
+          <TouchableOpacity onPress={fetchTripData} style={styles.retryButton}>
+            <Text style={styles.retryText}>Retry</Text>
+          </TouchableOpacity>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  const currentDayData = tripData.days.find((d: any) => d.dayNumber === currentDay) || tripData.days[0];
 
   const handlePreviousDay = () => {
     if (currentDay > 1) {
@@ -266,6 +355,38 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F5F3EF',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  loadingText: {
+    marginTop: 16,
+    fontSize: 16,
+    color: '#8B7355',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  errorText: {
+    fontSize: 18,
+    color: '#8B7355',
+    marginBottom: 20,
+  },
+  retryButton: {
+    backgroundColor: '#2F6F6D',
+    paddingHorizontal: 24,
+    paddingVertical: 12,
+    borderRadius: 8,
+  },
+  retryText: {
+    color: '#F4EBDC',
+    fontSize: 16,
+    fontWeight: '600',
   },
   header: {
     backgroundColor: '#FFFFFF',
