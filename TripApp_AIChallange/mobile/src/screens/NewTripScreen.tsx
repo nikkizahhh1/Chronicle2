@@ -105,7 +105,7 @@ export default function NewTripScreen({ navigation }: Props) {
           <Text style={styles.manualText}>Want to plan day-by-day yourself?</Text>
           <TouchableOpacity
             style={styles.manualButton}
-            onPress={() => navigation.navigate('TripQuestionnaire', { type: 'manual' })}
+            onPress={() => navigation.navigate('ManualTripBuilder')}
             activeOpacity={0.8}
           >
             <Text style={styles.manualButtonText}>I'll build it manually</Text>

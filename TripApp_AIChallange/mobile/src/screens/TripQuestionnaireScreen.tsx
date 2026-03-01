@@ -7,10 +7,13 @@ import {
   TouchableOpacity,
   TextInput,
   Image,
+  ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
 import Slider from '@react-native-community/slider';
+import { api } from '../services/api';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'TripQuestionnaire'>;
 
@@ -21,12 +24,72 @@ export default function TripQuestionnaireScreen({ navigation, route }: Props) {
   const [startingPoint, setStartingPoint] = useState('');
   const [endingPoint, setEndingPoint] = useState('');
   const [duration, setDuration] = useState('3');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
   const [budget, setBudget] = useState('500');
   const [busyness, setBusyness] = useState(0.5);
   const [travelWith, setTravelWith] = useState<'solo' | 'group'>('solo');
   const [includeGas, setIncludeGas] = useState(false);
   const [scenicRoute, setScenicRoute] = useState(true);
   const [includeTransport, setIncludeTransport] = useState(false);
+  const [loading, setLoading] = useState(false);
+
+  const handleGenerateTrip = async () => {
+    // Validation
+    if (type === 'location' && !destination) {
+      Alert.alert('Missing Info', 'Please enter a destination');
+      return;
+    }
+    if (type === 'roadtrip' && (!startingPoint || !endingPoint)) {
+      Alert.alert('Missing Info', 'Please enter starting and ending points');
+      return;
+    }
+
+    setLoading(true);
+
+    try {
+      // Build request payload
+      const payload: any = {
+        trip_type: type,
+        duration: parseInt(duration),
+        start_date: startDate,
+        end_date: endDate,
+        budget: budget,
+        intensity: Math.round(busyness * 10), // Convert 0-1 to 0-10
+        group_type: travelWith,
+      };
+
+      if (type === 'location') {
+        payload.destination = destination;
+      } else {
+        payload.start_location = startingPoint;
+        payload.end_location = endingPoint;
+        payload.include_gas = includeGas;
+        payload.scenic_route = scenicRoute;
+      }
+
+      // Call AI backend
+      const response = await api.post('/ai/itinerary/generate', payload);
+
+      if (response.success && response.data) {
+        // Generate a trip ID
+        const tripId = `trip-${Date.now()}`;
+
+        // Navigate to preview with generated itinerary
+        navigation.navigate('TripPreview', { tripId });
+      } else {
+        // Demo mode - use mock data
+        const tripId = `trip-demo-${Date.now()}`;
+        navigation.navigate('TripPreview', { tripId });
+      }
+    } catch (error) {
+      Alert.alert('Error', 'Failed to generate trip. Using demo data instead.');
+      const tripId = `trip-demo-${Date.now()}`;
+      navigation.navigate('TripPreview', { tripId });
+    } finally {
+      setLoading(false);
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -119,6 +182,28 @@ export default function TripQuestionnaireScreen({ navigation, route }: Props) {
               keyboardType="number-pad"
             />
             <Text style={styles.helperText}>How many days will you be exploring?</Text>
+          </View>
+
+          {/* Trip Dates */}
+          <View style={styles.card}>
+            <Text style={styles.cardTitle}>Trip Dates</Text>
+            <Text style={styles.label}>Start Date</Text>
+            <TextInput
+              style={styles.input}
+              value={startDate}
+              onChangeText={setStartDate}
+              placeholder="e.g., Mar 15, 2026"
+              placeholderTextColor="#999"
+            />
+            <Text style={styles.label}>End Date</Text>
+            <TextInput
+              style={styles.input}
+              value={endDate}
+              onChangeText={setEndDate}
+              placeholder="e.g., Mar 18, 2026"
+              placeholderTextColor="#999"
+            />
+            <Text style={styles.helperText}>When do you plan to travel?</Text>
           </View>
 
           {/* Budget */}
@@ -262,15 +347,24 @@ export default function TripQuestionnaireScreen({ navigation, route }: Props) {
               style={styles.backButtonBottom}
               onPress={() => navigation.goBack()}
               activeOpacity={0.8}
+              disabled={loading}
             >
               <Text style={styles.backButtonText}>Back</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={styles.generateButton}
-              onPress={() => navigation.navigate('Home')}
+              style={[styles.generateButton, loading && styles.generateButtonDisabled]}
+              onPress={handleGenerateTrip}
               activeOpacity={0.8}
+              disabled={loading}
             >
-              <Text style={styles.generateButtonText}>Generate My Trip</Text>
+              {loading ? (
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator color="#FFFFFF" size="small" />
+                  <Text style={styles.generateButtonText}>Generating...</Text>
+                </View>
+              ) : (
+                <Text style={styles.generateButtonText}>Generate My Trip</Text>
+              )}
             </TouchableOpacity>
           </View>
         </View>
@@ -344,6 +438,13 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#1F3D2B',
     marginBottom: 12,
+  },
+  label: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#1F3D2B',
+    marginTop: 12,
+    marginBottom: 8,
   },
   input: {
     backgroundColor: '#F5F5F5',
@@ -472,5 +573,13 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
+  },
+  generateButtonDisabled: {
+    opacity: 0.6,
+  },
+  loadingContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
 });

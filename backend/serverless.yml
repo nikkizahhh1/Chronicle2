@@ -9,6 +9,10 @@ provider:
     COGNITO_USER_POOL_ID: ${env:COGNITO_USER_POOL_ID}
     COGNITO_CLIENT_ID: ${env:COGNITO_CLIENT_ID}
     S3_BUCKET_NAME: ${env:S3_BUCKET_NAME}
+    BEDROCK_MODEL_ID: ${env:BEDROCK_MODEL_ID, 'anthropic.claude-sonnet-4-6-20260217-v1:0'}
+    AWS_REGION: ${self:provider.region}
+    LOCATION_MAP_NAME: ${env:LOCATION_MAP_NAME, 'TripMapView'}
+    LOCATION_PLACE_INDEX_NAME: ${env:LOCATION_PLACE_INDEX_NAME, 'TripPlaceIndex'}
   iam:
     role:
       statements:
@@ -42,6 +46,23 @@ provider:
             - s3:PutObjectAcl
           Resource:
             - "arn:aws:s3:::${env:S3_BUCKET_NAME}/*"
+        - Effect: Allow
+          Action:
+            - bedrock:InvokeModel
+          Resource: '*'
+        - Effect: Allow
+          Action:
+            - geo:GetMapTile
+            - geo:GetMapStyleDescriptor
+            - geo:GetMapSprites
+            - geo:GetMapGlyphs
+            - geo:SearchPlaceIndexForText
+            - geo:SearchPlaceIndexForPosition
+            - geo:CalculateRoute
+          Resource:
+            - "arn:aws:geo:${self:provider.region}:*:map/*"
+            - "arn:aws:geo:${self:provider.region}:*:place-index/*"
+            - "arn:aws:geo:${self:provider.region}:*:route-calculator/*"
 
 functions:
   signup:
@@ -252,5 +273,41 @@ functions:
           method: get
           cors: true
 
+  generateAiItinerary:
+    handler: handlers/ai_itinerary.generate
+    timeout: 60
+    events:
+      - http:
+          path: ai/itinerary/generate
+          method: post
+          cors: true
+
 plugins:
   - serverless-python-requirements
+
+resources:
+  Resources:
+    TripMapView:
+      Type: AWS::Location::Map
+      Properties:
+        Configuration:
+          Style: VectorEsriStreets
+        MapName: ${self:provider.environment.LOCATION_MAP_NAME}
+        Description: Map for trip visualization
+        PricingPlan: RequestBasedUsage
+
+    TripPlaceIndex:
+      Type: AWS::Location::PlaceIndex
+      Properties:
+        DataSource: Esri
+        IndexName: ${self:provider.environment.LOCATION_PLACE_INDEX_NAME}
+        Description: Place index for POI search
+        PricingPlan: RequestBasedUsage
+
+    TripRouteCalculator:
+      Type: AWS::Location::RouteCalculator
+      Properties:
+        CalculatorName: TripRouteCalculator
+        DataSource: Esri
+        Description: Route calculator for trip directions
+        PricingPlan: RequestBasedUsage

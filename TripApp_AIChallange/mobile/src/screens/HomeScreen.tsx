@@ -1,17 +1,20 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View,
   Text,
   StyleSheet,
-  SafeAreaView,
   ScrollView,
   TouchableOpacity,
   Image,
   StatusBar,
   Platform,
+  Alert,
+  Modal,
+  TextInput,
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Home'>;
 
@@ -38,6 +41,66 @@ const MOCK_TRIPS = [
 ];
 
 export default function HomeScreen({ navigation }: Props) {
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null);
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [selectedTripId, setSelectedTripId] = useState<string | null>(null);
+  const [startDateText, setStartDateText] = useState('Mar 15, 2026');
+  const [endDateText, setEndDateText] = useState('Mar 18, 2026');
+
+  const handleMenuToggle = (tripId: string, event: any) => {
+    event.stopPropagation();
+    setOpenMenuId(openMenuId === tripId ? null : tripId);
+  };
+
+  const handleEditTrip = (tripId: string) => {
+    setOpenMenuId(null);
+    navigation.navigate('TripListView', { tripId });
+  };
+
+  const handleChangeDate = (tripId: string) => {
+    setOpenMenuId(null);
+    setSelectedTripId(tripId);
+    setShowDatePicker(true);
+  };
+
+  const handleSaveDates = () => {
+    setShowDatePicker(false);
+    Alert.alert(
+      'Dates Updated',
+      `Trip dates changed to ${startDateText} - ${endDateText}`
+    );
+    // TODO: Update dates in backend
+  };
+
+  const handleCancelDatePicker = () => {
+    setShowDatePicker(false);
+    setSelectedTripId(null);
+  };
+
+  const handleReminisce = (tripId: string) => {
+    setOpenMenuId(null);
+    navigation.navigate('TripMemories', { tripId });
+  };
+
+  const handleDeleteTrip = (tripId: string) => {
+    setOpenMenuId(null);
+    Alert.alert(
+      'Delete Trip',
+      'Are you sure you want to delete this trip? This action cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: () => {
+            // TODO: Delete trip from backend
+            Alert.alert('Trip Deleted', 'Your trip has been deleted.');
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="rgba(255, 255, 255, 0.5)" translucent={false} />
@@ -58,7 +121,7 @@ export default function HomeScreen({ navigation }: Props) {
           </View>
             <View style={styles.headerRight}>
           <TouchableOpacity
-            onPress={() => navigation.navigate('Profile')}
+            onPress={() => navigation.navigate('Friends')}
             activeOpacity={0.7}
           >
             <Image
@@ -105,7 +168,7 @@ export default function HomeScreen({ navigation }: Props) {
             <TouchableOpacity
               key={trip.id}
               style={styles.tripCard}
-              onPress={() => navigation.navigate('TripListView', { tripId: trip.id })}
+              onPress={() => navigation.navigate('TripRouteView', { tripId: trip.id })}
               activeOpacity={0.9}
             >
               {/* Trip Image */}
@@ -118,11 +181,72 @@ export default function HomeScreen({ navigation }: Props) {
                 <View style={styles.statusBadge}>
                   <Text style={styles.statusText}>{trip.status}</Text>
                 </View>
-                <TouchableOpacity style={styles.tripMenuButton} activeOpacity={0.7}>
+                <TouchableOpacity
+                  style={styles.tripMenuButton}
+                  activeOpacity={0.7}
+                  onPress={(e) => handleMenuToggle(trip.id, e)}
+                >
                   <View style={styles.menuDot} />
                   <View style={styles.menuDot} />
                   <View style={styles.menuDot} />
                 </TouchableOpacity>
+
+                {/* Dropdown Menu */}
+                {openMenuId === trip.id && (
+                  <View style={styles.dropdownMenu}>
+                    <TouchableOpacity
+                      style={styles.menuItem}
+                      onPress={() => handleEditTrip(trip.id)}
+                      activeOpacity={0.7}
+                    >
+                      <Image
+                        source={require('../../assets/images/edit-icon.png')}
+                        style={styles.menuIcon}
+                        resizeMode="contain"
+                      />
+                      <Text style={styles.menuItemText}>Edit Trip</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.menuItem}
+                      onPress={() => handleChangeDate(trip.id)}
+                      activeOpacity={0.7}
+                    >
+                      <Image
+                        source={require('../../assets/images/calendar-icon.png')}
+                        style={styles.menuIcon}
+                        resizeMode="contain"
+                      />
+                      <Text style={styles.menuItemText}>Change Date</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={styles.menuItem}
+                      onPress={() => handleReminisce(trip.id)}
+                      activeOpacity={0.7}
+                    >
+                      <Image
+                        source={require('../../assets/images/camera2-icon.png')}
+                        style={styles.menuIcon}
+                        resizeMode="contain"
+                      />
+                      <Text style={styles.menuItemText}>Reminisce</Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                      style={[styles.menuItem, styles.menuItemLast]}
+                      onPress={() => handleDeleteTrip(trip.id)}
+                      activeOpacity={0.7}
+                    >
+                      <Image
+                        source={require('../../assets/images/trash-icon.png')}
+                        style={[styles.menuIcon, styles.menuIconDelete]}
+                        resizeMode="contain"
+                      />
+                      <Text style={styles.menuItemTextDelete}>Delete Trip</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
               </View>
 
               {/* Trip Info */}
@@ -161,6 +285,50 @@ export default function HomeScreen({ navigation }: Props) {
           </View>
         </View>
       </ScrollView>
+
+      {/* Date Picker Modal */}
+      {showDatePicker && (
+        <Modal
+          visible={showDatePicker}
+          transparent={true}
+          animationType="slide"
+          onRequestClose={handleCancelDatePicker}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.datePickerContainer}>
+              <View style={styles.datePickerHeader}>
+                <TouchableOpacity onPress={handleCancelDatePicker}>
+                  <Text style={styles.datePickerCancel}>Cancel</Text>
+                </TouchableOpacity>
+                <Text style={styles.datePickerTitle}>Change Dates</Text>
+                <TouchableOpacity onPress={handleSaveDates}>
+                  <Text style={styles.datePickerDone}>Done</Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.datePickerContent}>
+                <Text style={styles.dateLabel}>Start Date</Text>
+                <TextInput
+                  style={styles.dateInput}
+                  value={startDateText}
+                  onChangeText={setStartDateText}
+                  placeholder="e.g. Mar 15, 2026"
+                  placeholderTextColor="#999"
+                />
+
+                <Text style={styles.dateLabel}>End Date</Text>
+                <TextInput
+                  style={styles.dateInput}
+                  value={endDateText}
+                  onChangeText={setEndDateText}
+                  placeholder="e.g. Mar 18, 2026"
+                  placeholderTextColor="#999"
+                />
+              </View>
+            </View>
+          </View>
+        </Modal>
+      )}
     </View>
   );
 }
@@ -354,5 +522,104 @@ const styles = StyleSheet.create({
     fontSize: 13,
     color: '#666',
     lineHeight: 18,
+  },
+  dropdownMenu: {
+    position: 'absolute',
+    top: 48,
+    right: 12,
+    backgroundColor: '#FFFFFF',
+    borderRadius: 12,
+    paddingVertical: 8,
+    minWidth: 180,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+    zIndex: 1000,
+  },
+  menuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    gap: 12,
+  },
+  menuItemLast: {
+    borderTopWidth: 1,
+    borderTopColor: '#F0F0F0',
+  },
+  menuIcon: {
+    width: 20,
+    height: 20,
+    tintColor: '#1F3D2B',
+  },
+  menuIconDelete: {
+    tintColor: '#DC2626',
+  },
+  menuItemText: {
+    fontSize: 15,
+    color: '#1F3D2B',
+    fontWeight: '500',
+  },
+  menuItemTextDelete: {
+    fontSize: 15,
+    color: '#DC2626',
+    fontWeight: '500',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  datePickerContainer: {
+    backgroundColor: '#FFFFFF',
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 20,
+  },
+  datePickerHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E5E5',
+  },
+  datePickerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#1F3D2B',
+  },
+  datePickerCancel: {
+    fontSize: 16,
+    color: '#666',
+  },
+  datePickerDone: {
+    fontSize: 16,
+    color: '#6B9080',
+    fontWeight: '600',
+  },
+  datePickerContent: {
+    paddingHorizontal: 20,
+    paddingTop: 16,
+  },
+  dateLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1F3D2B',
+    marginTop: 16,
+    marginBottom: 8,
+  },
+  dateInput: {
+    backgroundColor: '#F4EBDC',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 16,
+    color: '#1F3D2B',
+    borderWidth: 1,
+    borderColor: '#E5E5E5',
   },
 });

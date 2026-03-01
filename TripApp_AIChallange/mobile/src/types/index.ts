@@ -63,6 +63,16 @@ export type RootStackParamList = {
   Home: undefined;
   NewTrip: undefined;
   TripQuestionnaire: { type: 'location' | 'roadtrip' };
+  ManualTripBuilder: undefined;
+  TripPreview: { tripId: string };
+  EditActivities: { tripId: string; dayNumber: number };
+  TripRouteView: { tripId: string };
+  TripDayListView: { tripId: string };
+  TravelDiary: { tripId: string };
+  TripMemories: { tripId: string };
+  Friends: undefined;
+  AddFriend: undefined;
+  ShareTrip: { friendId: string; friendName: string };
   TripListView: { tripId: string };
   TripMapView: { tripId: string };
   Profile: undefined;

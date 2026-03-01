@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { NativeStackScreenProps } from '@react-navigation/native-stack';
 import { RootStackParamList } from '../types';
+import { authService } from '../services/auth';
 
 type Props = NativeStackScreenProps<RootStackParamList, 'Login'>;
 
@@ -26,13 +27,24 @@ export default function LoginScreen({ navigation }: Props) {
     setLoading(true);
 
     try {
-      // TODO: Connect to backend API
-      setTimeout(() => {
+      const response = await authService.login({ email, password });
+
+      if (response.success) {
+        // Login successful, navigate to home
         navigation.navigate('Home');
-        setLoading(false);
-      }, 500);
+      } else {
+        // TEMPORARY: If backend not configured, skip to home for testing
+        if (response.error?.includes('Backend not configured')) {
+          // Allow testing without backend
+          navigation.navigate('Home');
+        } else {
+          // Show error message from API
+          setError(response.error || 'Login failed');
+        }
+      }
     } catch (err) {
-      setError('Invalid email or password');
+      setError('An unexpected error occurred');
+    } finally {
       setLoading(false);
     }
   };
